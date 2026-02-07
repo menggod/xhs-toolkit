@@ -261,8 +261,17 @@ class XHSClient:
                 if has_video:
                     await self._wait_for_video_upload_complete()
                 else:
-                    # 图片上传给少量时间
-                    await asyncio.sleep(2)
+                    # 图片上传可能需要更多时间处理，或者有裁剪弹窗等
+                    logger.info("⏳ 等待图片上传及处理...")
+                    await asyncio.sleep(5)
+                    
+                    # 检查是否出现编辑器，如果没有，可能是上传慢或者需要确认
+                    try:
+                        # 简单的检查，如果编辑器没出现，多等一会儿
+                        driver.find_element(By.CSS_SELECTOR, ".ql-editor")
+                    except:
+                        logger.info("⏳ 编辑器尚未出现，继续等待...")
+                        await asyncio.sleep(5)
                     
         except Exception as e:
             logger.warning(f"⚠️ 处理文件上传时出错: {e}")
@@ -378,7 +387,10 @@ class XHSClient:
             
             # 尝试多个内容选择器
             content_selectors = [
+                ".ProseMirror",
+                ".tiptap",
                 ".ql-editor",
+                "[contenteditable='true']",
                 "[placeholder*='内容']",
                 "[placeholder*='content']",
                 "textarea",

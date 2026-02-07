@@ -219,22 +219,60 @@ class XHSContentFiller(IContentFiller):
             内容编辑器元素，如果未找到返回None
         """
         driver = self.browser_manager.driver
-        wait = WebDriverWait(driver, XHSConfig.DEFAULT_WAIT_TIME)
+        wait = WebDriverWait(driver, 20)  # Increase timeout
         
+        # Multiple selectors to try
+        selectors = [
+            XHSSelectors.CONTENT_EDITOR,  # .ProseMirror
+            ".tiptap",
+            ".ql-editor", 
+            "[contenteditable='true']",
+            ".content-input",
+            "div[class*='editor']",
+            "#post-textarea",
+            "textarea"
+        ]
+        
+        # 1. Try finding in main document
+        for selector in selectors:
+            try:
+                logger.debug(f"🔍 尝试查找内容编辑器: {selector}")
+                # Use presence first, then clickable to be safer
+                element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, selector)))
+                if element.is_displayed():
+                    logger.info(f"✅ 找到内容编辑器: {selector}")
+                    return element
+            except:
+                continue
+        
+        # 2. Try searching within iframes if not found
         try:
-            logger.debug(f"🔍 查找内容编辑器: {XHSSelectors.CONTENT_EDITOR}")
-            content_editor = wait.until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, XHSSelectors.CONTENT_EDITOR))
-            )
-            
-            if content_editor and content_editor.is_enabled():
-                logger.info("✅ 找到内容编辑器")
-                return content_editor
-            
-        except TimeoutException:
-            logger.error("⏰ 内容编辑器查找超时")
+            iframes = driver.find_elements(By.TAG_NAME, "iframe")
+            if iframes:
+                logger.info(f"⚠️ 主文档未找到，尝试在 {len(iframes)} 个iframe中查找...")
+                for i, frame in enumerate(iframes):
+                    driver.switch_to.frame(frame)
+                    for selector in selectors:
+                        try:
+                            element = driver.find_element(By.CSS_SELECTOR, selector)
+                            if element.is_displayed():
+                                logger.info(f"✅ 在iframe[{i}]中找到编辑器: {selector}")
+                                # Note: Ideally we should return context, but for now just return element
+                                # Caution: accessing element after switch_to.default_content() might fail?
+                                # Usually selenium elements are tied to the context.
+                                # If we return here, the caller must know we are in a frame.
+                                # Since we can't change caller easily, we switch back and hope element ID is unique or handle error upper.
+                                # Actually, if we switch back, the element reference often becomes stale.
+                                # For now, we log and return None to prompt manual check or different error.
+                                logger.warning("found in iframe but architecture prevents context switch return")
+                                driver.switch_to.default_content()
+                                return None 
+                        except:
+                            pass
+                    driver.switch_to.default_content()
         except Exception as e:
-            logger.error(f"⚠️ 内容编辑器查找错误: {e}")
+            logger.warning(f"Iframe search failed: {e}")
+            driver.switch_to.default_content()
         
         logger.error("❌ 未找到可用的内容编辑器")
         return None

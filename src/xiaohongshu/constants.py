@@ -31,7 +31,7 @@ class XHSSelectors:
     # 内容填写
     TITLE_INPUT = ".d-text"
     TITLE_INPUT_ALT = "[placeholder*='标题']"
-    CONTENT_EDITOR = ".ql-editor"
+    CONTENT_EDITOR = ".ProseMirror" # Updated from .ql-editor based on inspection
     
     # 发布按钮
     PUBLISH_BUTTON = ".publishBtn"
